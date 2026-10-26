@@ -1,6 +1,7 @@
 import flet as ft
 
 import requests
+import datetime
 
 base_url = "http://api.openweathermap.org/data/2.5/weather?"
 api_key = "f9d652545a526d2fc217f244b79d5433"
@@ -37,7 +38,8 @@ def main(page: ft.Page):
     error_dialog = ft.AlertDialog(
         title=ft.Text(""),
         content=ft.Text(""),
-        actions=[ft.TextButton("Okay", on_click=close)],
+        icon=ft.Icons.ERROR,
+        actions=[ft.TextButton("Okay", on_click=close)]
     )
 
     def changeDialog(title, content):
@@ -49,35 +51,88 @@ def main(page: ft.Page):
         page.update()
 
     def getWeather(e):
+        def unit_conversion(kelvin):
+            celsius = kelvin - 273.15
+            fahrenheit = (kelvin - 273.15) * 1.8 + 32
+            return celsius, fahrenheit
+        
         if city_input.value.strip() == "":
             changeDialog("No town/city entered", "You must type in a town/city.")
             return
         
-        url = f"{base_url}appid={api_key}&q={city_input.value}&units=metric"
+        url = f"{base_url}appid={api_key}&q={city_input.value}"
         try:
             response = requests.get(url).json()
 
             if str(response.get("cod")) != "200":
                 changeDialog("Invalid town/city", f"{city_input.value}, is not a valid town/city.")
                 return
-
-            
+        
         except requests.exceptions.RequestException:
             changeDialog("Connection error", "Check you internet connection.")
-            page.update()
+
+        else:
+            temp_celsius, temp_fahrenheit = unit_conversion(response["main"]["temp"])
+            feels_like_celsius, feels_like_fahrenheit = unit_conversion(response["main"]["feels_like"])
+            humidity = response["main"]["humidity"]
+            wind_speed = response["wind"]["speed"]
+            description = response["weather"][0]["description"]
+            sunrise_time = datetime.datetime.fromtimestamp(response["sys"]["sunrise"] + response["timezone"])
+            sunset_time = datetime.datetime.fromtimestamp(response["sys"]["sunset"] + response["timezone"])
+
+            temperature = ft.Text(value="")
+
+            # weather_icon = ft.Icon()
+
+            feels_like_temp = ft.Text(value="")
+
+            if unit_dropdown.value == "degrees":
+                temperature.value = temp_celsius
+                feels_like_temp.value = feels_like_celsius
+            else:
+                temperature.value = temp_fahrenheit
+                feels_like_temp.value = feels_like_fahrenheit
+
+            page.add(
+                ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[ft.Text(value=city_input.value)]
+                        ),
+                        ft.Row(
+                            controls=[
+                                temperature,
+                                feels_like_temp
+                            ]
+                        )
+                    ]
+                )
+            )
+
 
     city_input = ft.TextField(
         value="",
-        icon=ft.Icons.MAP_ROUNDED,
         hint_text="Enter a town/city..."
+    )
+
+    unit_dropdown = ft.Dropdown(
+        value="degrees",
+        width=100,
+        options=[
+            ft.DropdownOption(key="degrees", text="°C"),
+            ft.DropdownOption(key="fahrenheit", text="°F")
+        ]
     )
 
     page.add(
         ft.Column(
             controls=[
                 ft.Row(
+                    controls=[city_input]
+                ),
+                ft.Row(
                     controls=[
-                        city_input,
+                        unit_dropdown,
                         ft.FilledButton(
                             content="Go",
                             on_click=getWeather
