@@ -1,5 +1,7 @@
 import flet as ft
 
+import math
+
 import requests
 import datetime
 
@@ -9,6 +11,7 @@ api_key = "f9d652545a526d2fc217f244b79d5433"
 def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     
+    '''
     def setTheme(e):
         if page.theme_mode == ft.ThemeMode.DARK:
             page.theme_mode = ft.ThemeMode.LIGHT
@@ -30,6 +33,7 @@ def main(page: ft.Page):
         center_title=True,
         actions=[theme_button]
     )
+    '''
 
     def close(e):
         error_dialog.open = False
@@ -50,10 +54,182 @@ def main(page: ft.Page):
         error_dialog.open = True
         page.update()
 
+    city_input = ft.TextField(
+        value="",
+        hint_text="Search for a town or city"
+    )
+
+    '''
+    def clearInput(e):
+        city_input.value = ""
+    '''
+    
+    unit_dropdown = ft.Dropdown(
+        value="degrees",
+        width=100,
+        options=[
+            ft.DropdownOption(key="degrees", text="°C"),
+            ft.DropdownOption(key="fahrenheit", text="°F")
+        ]
+    )
+
+    temperature = ft.Text(
+        value="",
+        size=80,
+        weight=ft.FontWeight.BOLD
+    )
+    feels_like_temp = ft.Text(
+        value="",
+        size=15
+    )
+
+    city_name_display = ft.Text(
+        value="",
+        size=20
+    )
+
+    wind_speed_display = ft.Text(
+        value="",
+        size=55
+    )
+
+    wind_direction_display = ft.Icon(
+        icon=ft.Icons.ARROW_BACK_ROUNDED,
+        size=70,
+        rotate=ft.Rotate(
+            angle=math.radians(90),
+            alignment=ft.Alignment.CENTER
+        )
+    )
+
+    def closeWeather(e):
+        weather_display.visible = False
+        input_display.visible = True
+
+    weather_display = ft.Column(
+        visible=False,
+        controls=[
+            ft.Row(
+                controls=[
+                    ft.TextButton(
+                        content="Back",
+                        icon=ft.Icons.ARROW_BACK,
+                        on_click=closeWeather
+                    )
+                ]
+            ),
+            ft.Row(
+                controls=[city_name_display],
+                alignment=ft.MainAxisAlignment.CENTER
+            ),
+            ft.Row(
+                controls=[temperature],
+                alignment=ft.MainAxisAlignment.CENTER
+            ),
+            ft.Row(
+                controls=[feels_like_temp],
+                alignment=ft.MainAxisAlignment.CENTER
+            ),
+            ft.Row(
+                ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Icon(
+                                        icon=ft.Icons.AIR_ROUNDED,
+                                        size=25
+                                    ),
+                                    ft.Text(
+                                        value="Wind",
+                                        size=25
+                                    )
+                                ],
+                                alignment=ft.CrossAxisAlignment.CENTER
+                            ),
+                            ft.Row(
+                                controls=[
+                                    wind_speed_display,
+                                    ft.Text(
+                                        value="mph",
+                                        size=25
+                                    )
+                                ],
+                                alignment=ft.CrossAxisAlignment.CENTER
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(
+                                        value="Direction"
+                                    ),
+                                    wind_direction_display
+                                ],
+                                alignment=ft.CrossAxisAlignment.CENTER
+                            )
+                        ]
+                    ),
+                    bgcolor="#07070B",
+                    border_radius=15,
+                    expand=True,
+                    margin=10,
+                    padding=10
+                ),
+                alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            ft.Row(
+                ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Icon(
+                                        icon=ft.Icons.AIR_ROUNDED,
+                                        size=25
+                                    ),
+                                    ft.Text(
+                                        value="Sunset/Sunrise",
+                                        size=25
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                    bgcolor="#07070B",
+                    border_radius=15,
+                    expand=True,
+                    margin=10,
+                    padding=10,
+                ),
+                alignment=ft.CrossAxisAlignment.CENTER
+            )
+        ]
+    )
+
+    input_display = ft.Column(
+        visible=True,
+        controls=[
+            ft.Row(
+                controls=[
+                    city_input
+                ],
+                margin=10
+            ),
+            ft.Row(
+                controls=[
+                    unit_dropdown,
+                    ft.FilledButton(
+                        content="Go",
+                        on_click=lambda e: getWeather(e)
+                    )
+                ]
+            )
+        ]
+    )
+
     def getWeather(e):
         def unit_conversion(kelvin):
-            celsius = kelvin - 273.15
-            fahrenheit = (kelvin - 273.15) * 1.8 + 32
+            celsius = round(kelvin - 273.15)
+            fahrenheit = round((kelvin - 273.15) * 1.8 + 32)
             return celsius, fahrenheit
         
         if city_input.value.strip() == "":
@@ -65,83 +241,50 @@ def main(page: ft.Page):
             response = requests.get(url).json()
 
             if str(response.get("cod")) != "200":
-                changeDialog("Invalid town/city", f"{city_input.value}, is not a valid town/city.")
+                changeDialog("Invalid town/city", f"{city_input.value} is not a valid town/city.")
                 return
-        
         except requests.exceptions.RequestException:
-            changeDialog("Connection error", "Check you internet connection.")
+            changeDialog("Connection error", "Check your internet connection.")
+            return
 
-        else:
-            temp_celsius, temp_fahrenheit = unit_conversion(response["main"]["temp"])
-            feels_like_celsius, feels_like_fahrenheit = unit_conversion(response["main"]["feels_like"])
-            humidity = response["main"]["humidity"]
-            wind_speed = response["wind"]["speed"]
-            description = response["weather"][0]["description"]
-            sunrise_time = datetime.datetime.fromtimestamp(response["sys"]["sunrise"] + response["timezone"])
-            sunset_time = datetime.datetime.fromtimestamp(response["sys"]["sunset"] + response["timezone"])
+        weather_display.visible = True
+        input_display.visible = False
+        
+        city_name_display.value = response["name"]
 
-            temperature = ft.Text(value="")
+        humidity = response["main"]["humidity"]
+        humidity = f"{humidity}%"
+        pressure = response["main"]["pressure"]
+        pressure = f"{pressure} hPa"
+        visibility = round((response["visibility"])/1609.344)
+        visibility = f"{visibility} mi"
 
-            # weather_icon = ft.Icon()
+        wind_speed = response["wind"]["speed"]
+        wind_speed = round(wind_speed * 2.23694)
+        wind_direction = response["wind"]["deg"]
+        wind_speed_display.value = wind_speed
+        wind_direction_display.rotate.angle = math.radians(wind_direction + 90)
 
-            feels_like_temp = ft.Text(value="")
-
-            if unit_dropdown.value == "degrees":
-                temperature.value = temp_celsius
-                feels_like_temp.value = feels_like_celsius
-            else:
-                temperature.value = temp_fahrenheit
-                feels_like_temp.value = feels_like_fahrenheit
-
-            page.add(
-                ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[ft.Text(value=city_input.value)]
-                        ),
-                        ft.Row(
-                            controls=[
-                                temperature,
-                                feels_like_temp
-                            ]
-                        )
-                    ]
-                )
-            )
-
-
-    city_input = ft.TextField(
-        value="",
-        hint_text="Enter a town/city..."
-    )
-
-    unit_dropdown = ft.Dropdown(
-        value="degrees",
-        width=100,
-        options=[
-            ft.DropdownOption(key="degrees", text="°C"),
-            ft.DropdownOption(key="fahrenheit", text="°F")
-        ]
-    )
-
-    page.add(
-        ft.Column(
-            controls=[
-                ft.Row(
-                    controls=[city_input]
-                ),
-                ft.Row(
-                    controls=[
-                        unit_dropdown,
-                        ft.FilledButton(
-                            content="Go",
-                            on_click=getWeather
-                        )
-                    ]
-                )
-            ]
+        sunrise = datetime.datetime.fromtimestamp(response["sys"]["sunrise"]).strftime(
+            "%I:%M %p"
         )
-    )
+        sunset = datetime.datetime.fromtimestamp(response["sys"]["sunset"]).strftime(
+            "%I:%M %p"
+        )
+        
+        temp_celsius, temp_fahrenheit = unit_conversion(response["main"]["temp"])
+        feels_like_celsius, feels_like_fahrenheit = unit_conversion(response["main"]["feels_like"])
+
+        if unit_dropdown.value == "degrees":
+            temperature.value = f"{temp_celsius}°C"
+            feels_like_temp.value = f"Feels like: {feels_like_celsius}°C"
+        else:
+            temperature.value = f"{temp_fahrenheit}°F"
+            feels_like_temp.value = f"Feels like: {feels_like_fahrenheit}°F"
+
+        page.update()
+
+    page.add(input_display, weather_display)
 
 if __name__ == "__main__":
     ft.run(main)
